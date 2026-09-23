@@ -41,14 +41,4 @@ public struct LaunchAgent {
                                                       format: .xml, options: 0)
         try data.write(to: plistURL, options: .atomic)
     }
-
-    /// Renomme le plist d'un ancien agent en `.disabled` (réversible).
-    public static func disableLegacy(label: String, directory: URL) throws -> URL? {
-        let source = directory.appendingPathComponent("\(label).plist")
-        guard FileManager.default.fileExists(atPath: source.path) else { return nil }
-        let destination = source.appendingPathExtension("disabled")
-        try? FileManager.default.removeItem(at: destination)
-        try FileManager.default.moveItem(at: source, to: destination)
-        return destination
-    }
 }

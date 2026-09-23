@@ -17,16 +17,6 @@ final class LaunchAgentTests: XCTestCase {
         XCTAssertEqual(agent.plistURL.lastPathComponent, "io.github.corentingc.captive-watchdog.plist")
     }
 
-    func testDisableLegacyRenamesThePlist() throws {
-        let dir = try TempDir.make()
-        let legacy = dir.appendingPathComponent("org.example.old-watchdog.plist")
-        try Data("x".utf8).write(to: legacy)
-        let moved = try XCTUnwrap(try LaunchAgent.disableLegacy(label: "org.example.old-watchdog", directory: dir))
-        XCTAssertEqual(moved.lastPathComponent, "org.example.old-watchdog.plist.disabled")
-        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
-        XCTAssertNil(try LaunchAgent.disableLegacy(label: "org.example.absent", directory: dir))
-    }
-
     func testAppAgentStaysQuitAfterACleanExit() throws {
         let agent = LaunchAgent(directory: try TempDir.make())
         let plist = agent.plist(executable: "/Applications/CaptiveWatchdog.app/Contents/MacOS/CaptiveWatchdog",

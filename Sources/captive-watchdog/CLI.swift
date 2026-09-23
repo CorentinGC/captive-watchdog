@@ -57,7 +57,7 @@ struct CLI {
       captive-watchdog profile learn <page.html> [--url URL] [--save]
       captive-watchdog profile test <page.html> [--url URL]  payload qui serait envoyé
       captive-watchdog config show | path | set <clé> <valeur>
-      captive-watchdog install-agent [--app CaptiveWatchdog.app] [--disable-legacy LABEL]
+      captive-watchdog install-agent [--app CaptiveWatchdog.app]
       captive-watchdog uninstall-agent
       captive-watchdog --version
     """
@@ -294,7 +294,7 @@ struct CLI {
     // MARK: agent
 
     func installAgent(_ raw: [String]) throws -> Int32 {
-        let args = try Args(raw, valued: ["--disable-legacy", "--app"])
+        let args = try Args(raw, valued: ["--app"])
         let config = try Config.load(from: paths.config)
         // L'app sait demander l'e-mail au premier lancement ; le démon CLI non.
         guard !config.email.isEmpty || args.options["--app"] != nil else {
@@ -302,14 +302,6 @@ struct CLI {
         }
         try paths.ensure()
         let agent = LaunchAgent()
-        if let legacy = args.options["--disable-legacy"] {
-            _ = tool("/bin/launchctl", ["bootout", "\(LaunchAgent.domain)/\(legacy)"], quiet: true)
-            if let moved = try LaunchAgent.disableLegacy(label: legacy, directory: agent.directory) {
-                print("ancien agent arrêté et désactivé : \(moved.path)")
-            } else {
-                print("aucun plist \(legacy) trouvé (déjà désactivé ?)")
-            }
-        }
         let executable: String
         let kind: LaunchAgent.Kind
         if let app = args.options["--app"] {

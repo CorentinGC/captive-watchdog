@@ -15,7 +15,7 @@ parce que le problème est banal et l'outillage existant, inexistant ou abandonn
 
 ## 2. Acquis à préserver
 
-Une v1 Python (`legacy/wifi-watchdog.py`) a réussi une reconnexion
+Une v1 Python (script unique, stdlib seule) a réussi une reconnexion
 réelle le 2026-09-23, en 6 secondes. Elle a permis d'établir des
 faits que la v2 doit conserver :
 
@@ -235,10 +235,9 @@ dépendance. Des fixtures synthétiques couvrent les variantes non rencontrées
 
 ## 13. Bascule depuis la v1
 
-La v1 Python reste active jusqu'à ce que la v2 ait réussi une coupure réelle.
-Deux moteurs simultanés se disputeraient le même portail, donc
-`install-agent` désactive l'agent Python. Le script v1 est archivé dans
-`legacy/` : c'est la référence qui a servi à écrire les tests.
+Faite le 2026-09-23 : la v1 Python a été désinstallée puis retirée du dépôt
+(elle reste dans l'historique git). Deux moteurs simultanés se disputeraient le
+même portail : on n'en fait jamais tourner deux.
 
 ## 14. Risques
 
