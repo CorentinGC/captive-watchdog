@@ -14,22 +14,30 @@ public struct LaunchAgent {
         self.directory = directory
     }
 
-    public func plist(executable: String, arguments: [String] = ["run"], logs: URL) -> [String: Any] {
-        [
+    public enum Kind: Sendable {
+        /// `captive-watchdog run`, relancé en permanence.
+        case daemon
+        /// L'app menubar : « Quitter » la laisse quittée jusqu'au prochain login.
+        case app
+    }
+
+    public func plist(executable: String, kind: Kind = .daemon, logs: URL) -> [String: Any] {
+        let keepAlive: Any = kind == .daemon ? true : ["SuccessfulExit": false]
+        return [
             "Label": label,
-            "ProgramArguments": [executable] + arguments,
+            "ProgramArguments": kind == .daemon ? [executable, "run"] : [executable],
             "RunAtLoad": true,
-            "KeepAlive": true,
+            "KeepAlive": keepAlive,
             "ThrottleInterval": 30,
-            "ProcessType": "Background",
+            "ProcessType": kind == .daemon ? "Background" : "Interactive",
             "StandardOutPath": logs.appendingPathComponent("launchd.out.log").path,
             "StandardErrorPath": logs.appendingPathComponent("launchd.err.log").path,
         ]
     }
 
-    public func write(executable: String, logs: URL) throws {
+    public func write(executable: String, kind: Kind = .daemon, logs: URL) throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let data = try PropertyListSerialization.data(fromPropertyList: plist(executable: executable, logs: logs),
+        let data = try PropertyListSerialization.data(fromPropertyList: plist(executable: executable, kind: kind, logs: logs),
                                                       format: .xml, options: 0)
         try data.write(to: plistURL, options: .atomic)
     }

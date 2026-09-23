@@ -26,4 +26,17 @@ final class LaunchAgentTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
         XCTAssertNil(try LaunchAgent.disableLegacy(label: "org.example.absent", directory: dir))
     }
+
+    func testAppAgentStaysQuitAfterACleanExit() throws {
+        let agent = LaunchAgent(directory: try TempDir.make())
+        let plist = agent.plist(executable: "/Applications/CaptiveWatchdog.app/Contents/MacOS/CaptiveWatchdog",
+                                kind: .app, logs: URL(fileURLWithPath: "/tmp/cw-logs"))
+        XCTAssertEqual(plist["ProgramArguments"] as? [String], ["/Applications/CaptiveWatchdog.app/Contents/MacOS/CaptiveWatchdog"])
+        XCTAssertEqual(plist["KeepAlive"] as? [String: Bool], ["SuccessfulExit": false])
+        XCTAssertEqual(plist["ProcessType"] as? String, "Interactive")
+        let daemon = agent.plist(executable: "/usr/local/bin/captive-watchdog", kind: .daemon, logs: URL(fileURLWithPath: "/tmp"))
+        XCTAssertEqual(daemon["ProgramArguments"] as? [String], ["/usr/local/bin/captive-watchdog", "run"])
+        XCTAssertEqual(daemon["KeepAlive"] as? Bool, true)
+        XCTAssertEqual(daemon["ProcessType"] as? String, "Background")
+    }
 }
