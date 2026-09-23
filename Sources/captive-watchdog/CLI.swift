@@ -57,7 +57,7 @@ struct CLI {
       captive-watchdog profile learn <page.html> [--url URL] [--save]
       captive-watchdog profile test <page.html> [--url URL]  payload qui serait envoyé
       captive-watchdog config show | path | set <clé> <valeur>
-      captive-watchdog install-agent [--disable-legacy LABEL]
+      captive-watchdog install-agent [--app CaptiveWatchdog.app] [--disable-legacy LABEL]
       captive-watchdog uninstall-agent
       captive-watchdog --version
     """
@@ -294,9 +294,10 @@ struct CLI {
     // MARK: agent
 
     func installAgent(_ raw: [String]) throws -> Int32 {
-        let args = try Args(raw, valued: ["--disable-legacy"])
+        let args = try Args(raw, valued: ["--disable-legacy", "--app"])
         let config = try Config.load(from: paths.config)
-        guard !config.email.isEmpty else {
+        // L'app sait demander l'e-mail au premier lancement ; le démon CLI non.
+        guard !config.email.isEmpty || args.options["--app"] != nil else {
             throw CLIError.message("configurez d'abord l'e-mail : captive-watchdog config set email vous@example.com")
         }
         try paths.ensure()
@@ -309,11 +310,23 @@ struct CLI {
                 print("aucun plist \(legacy) trouvé (déjà désactivé ?)")
             }
         }
-        let executable = Self.invokedExecutablePath()
+        let executable: String
+        let kind: LaunchAgent.Kind
+        if let app = args.options["--app"] {
+            let bundle = URL(fileURLWithPath: app).standardizedFileURL
+            executable = bundle.appendingPathComponent("Contents/MacOS/CaptiveWatchdog").path
+            guard FileManager.default.isExecutableFile(atPath: executable) else {
+                throw CLIError.message("exécutable introuvable dans \(bundle.path) (attendu \(executable))")
+            }
+            kind = .app
+        } else {
+            executable = Self.invokedExecutablePath()
+            kind = .daemon
+        }
         if executable.contains("/.build/") {
             fputs("attention : binaire de build (\(executable)) ; l'agent cassera si .build est nettoyé.\n", stderr)
         }
-        try agent.write(executable: executable, logs: paths.logs)
+        try agent.write(executable: executable, kind: kind, logs: paths.logs)
         _ = tool("/bin/launchctl", ["bootout", "\(LaunchAgent.domain)/\(agent.label)"], quiet: true)
         let rc = tool("/bin/launchctl", ["bootstrap", LaunchAgent.domain, agent.plistURL.path])
         guard rc == 0 else { throw CLIError.message("launchctl bootstrap a échoué (code \(rc))") }
