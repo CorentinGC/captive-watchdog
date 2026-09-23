@@ -20,6 +20,7 @@ public enum EngineMode: Equatable, Sendable {
 }
 
 /// Ce que le menu affiche, calculé depuis state.json : aucune logique dans les vues.
+/// Symboles « bouclier » : un glyphe Wi-Fi se confondrait avec celui du système.
 public struct StatusSnapshot: Equatable, Sendable {
     public var symbol: String
     public var headline: String
@@ -34,12 +35,12 @@ public struct StatusSnapshot: Equatable, Sendable {
         var symbol: String
         let headline: String
         switch state.status {
-        case .online: headline = "En ligne"; symbol = "wifi"
-        case .captive: headline = "Portail captif"; symbol = "wifi.exclamationmark"
-        case .offline: headline = "Hors ligne"; symbol = "wifi.slash"
-        case .unknown: headline = "État inconnu"; symbol = "wifi.circle"
+        case .online: headline = "En ligne"; symbol = "checkmark.shield"
+        case .captive: headline = "Portail captif"; symbol = "exclamationmark.shield"
+        case .offline: headline = "Hors ligne"; symbol = "xmark.shield"
+        case .unknown: headline = "État inconnu"; symbol = "shield"
         }
-        if state.consecutiveFailures > 0 { symbol = "wifi.exclamationmark" }
+        if state.consecutiveFailures > 0 { symbol = "exclamationmark.shield" }
 
         let engine: String
         switch mode {
@@ -49,13 +50,13 @@ public struct StatusSnapshot: Equatable, Sendable {
             engine = "Surveillance : démon en ligne de commande (pid \(pid))"
         case .needsEmail:
             engine = "Surveillance : e-mail à configurer"
-            symbol = "wifi.exclamationmark"
+            symbol = "exclamationmark.shield"
         case .stopped:
             engine = "Surveillance : suspendue"
-            symbol = "pause.circle"
+            symbol = "shield.slash"
         case .configError(let message):
             engine = "Surveillance : \(message)"
-            symbol = "wifi.exclamationmark"
+            symbol = "exclamationmark.shield"
         }
 
         let detail = state.lastRenew.map { date -> String in

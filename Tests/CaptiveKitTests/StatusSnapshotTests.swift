@@ -13,7 +13,7 @@ final class StatusSnapshotTests: XCTestCase {
         state.lastRenewDuration = 6
         state.lastIncident = "20231114-221320-wifi.moveon-hotelbb.com"
         let s = StatusSnapshot.make(state: state, mode: .hosting, now: now)
-        XCTAssertEqual(s.symbol, "wifi")
+        XCTAssertEqual(s.symbol, "checkmark.shield")
         XCTAssertEqual(s.headline, "En ligne")
         XCTAssertEqual(s.lastRenew, "Dernier renouvellement : il y a 3 h")
         XCTAssertEqual(s.lastRenewDetail, "\(Format.timestamp(state.lastRenew!)) — wifi.moveon-hotelbb.com (6 s)")
@@ -29,7 +29,7 @@ final class StatusSnapshotTests: XCTestCase {
         state.consecutiveFailures = 2
         state.lastFailureReason = "toujours captif après le login"
         let s = StatusSnapshot.make(state: state, mode: .hosting, now: now)
-        XCTAssertEqual(s.symbol, "wifi.exclamationmark")
+        XCTAssertEqual(s.symbol, "exclamationmark.shield")
         XCTAssertEqual(s.headline, "Portail captif")
         XCTAssertEqual(s.failure, "2 échec(s) d'affilée — toujours captif après le login")
     }
@@ -41,17 +41,17 @@ final class StatusSnapshotTests: XCTestCase {
         XCTAssertNil(s.lastRenewDetail)
         XCTAssertNil(s.lastCheck)
         XCTAssertEqual(s.engine, "Surveillance : e-mail à configurer")
-        XCTAssertEqual(s.symbol, "wifi.exclamationmark")
+        XCTAssertEqual(s.symbol, "exclamationmark.shield")
     }
 
     func testEngineModes() {
         var state = WatchdogState()
         state.status = .offline
-        XCTAssertEqual(StatusSnapshot.make(state: state, mode: .hosting, now: now).symbol, "wifi.slash")
+        XCTAssertEqual(StatusSnapshot.make(state: state, mode: .hosting, now: now).symbol, "xmark.shield")
         XCTAssertEqual(StatusSnapshot.make(state: state, mode: .observing(4242), now: now).engine,
                        "Surveillance : démon en ligne de commande (pid 4242)")
         let stopped = StatusSnapshot.make(state: state, mode: .stopped, now: now)
-        XCTAssertEqual(stopped.symbol, "pause.circle")
+        XCTAssertEqual(stopped.symbol, "shield.slash")
         XCTAssertEqual(stopped.engine, "Surveillance : suspendue")
         XCTAssertTrue(EngineMode.observing(1).isObserving)
         XCTAssertFalse(EngineMode.hosting.isObserving)
@@ -60,6 +60,11 @@ final class StatusSnapshotTests: XCTestCase {
     func testConfigErrorIsShown() {
         let s = StatusSnapshot.make(state: WatchdogState(), mode: .configError("config.json illisible"), now: now)
         XCTAssertEqual(s.engine, "Surveillance : config.json illisible")
-        XCTAssertEqual(s.symbol, "wifi.exclamationmark")
+        XCTAssertEqual(s.symbol, "exclamationmark.shield")
+    }
+
+    /// L'icône ne doit pas se confondre avec l'indicateur Wi-Fi du système.
+    func testUnknownStateUsesAPlainShield() {
+        XCTAssertEqual(StatusSnapshot.make(state: WatchdogState(), mode: .hosting, now: now).symbol, "shield")
     }
 }
