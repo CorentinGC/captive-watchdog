@@ -1,3 +1,5 @@
 import CaptiveKit
+import Foundation
 
-print("captive-watchdog \(BuildInfo.version)")
+let code = await CLI(arguments: Array(CommandLine.arguments.dropFirst()), paths: .standard()).run()
+exit(code)
