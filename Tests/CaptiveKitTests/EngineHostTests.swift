@@ -25,7 +25,8 @@ final class EngineHostTests: XCTestCase {
 
     /// Hôte dont le moteur parle au stub, avec un intervalle d'une heure :
     /// seul un réveil explicite peut déclencher un second cycle rapidement.
-    func makeHost(root: URL, email: String? = BnB.email, signals: SignalRecorder = SignalRecorder()) throws -> EngineHost {
+    func makeHost(root: URL, email: String? = BnB.email, signals: SignalRecorder = SignalRecorder(),
+                  sleep: @escaping @Sendable (Double) async -> Void = { _ in try? await Task.sleep(nanoseconds: 5_000_000) }) throws -> EngineHost {
         let paths = Paths(root: root)
         try paths.ensure()
         if let email {
@@ -38,7 +39,7 @@ final class EngineHostTests: XCTestCase {
         return EngineHost(paths: paths, makeEngine: { config in
             WatchdogEngine(paths: paths, config: config, logger: Logger(url: nil), environment: .init(
                 makeClient: { _ in StubURLProtocol.client() },
-                sleep: { _ in try? await Task.sleep(nanoseconds: 5_000_000) },
+                sleep: sleep,
                 now: { clock.tick() },
                 ssid: { nil },
                 notifier: RecordingNotifier()))
@@ -70,7 +71,8 @@ final class EngineHostTests: XCTestCase {
         host.stop()
         XCTAssertEqual(host.mode, .stopped)
         XCTAssertEqual(host.refresh(), .stopped, "une suspension n'est pas levée par refresh()")
-        XCTAssertNil(InstanceLock.holderPID(at: Paths(root: root).lock))
+        let released = await waitUntil { InstanceLock.holderPID(at: Paths(root: root).lock) == nil }
+        XCTAssertTrue(released, "verrou rendu une fois le moteur sorti")
     }
 
     func testReconnectWakesTheHostedEngine() async throws {
@@ -116,4 +118,46 @@ final class EngineHostTests: XCTestCase {
         XCTAssertEqual(try host.setEmail("  \(BnB.email) "), .hosting)
         XCTAssertEqual(try Config.load(from: Paths(root: root).config).email, BnB.email)
     }
+
+    func testResumeWaitsForTheCancelledEngineToFinish() async throws {
+        StubURLProtocol.reset { _ in .html(BnB.successPage) }
+        let root = try TempDir.make()
+        let gate = Gate()
+        let host = try makeHost(root: root, sleep: { _ in
+            while !gate.isOpen { usleep(1000) }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        })
+        defer { host.stop() }
+        XCTAssertEqual(host.start(), .hosting)
+        let store = StateStore(paths: Paths(root: root))
+        let ran = await waitUntil { store.load().lastCheck != nil }
+        XCTAssertTrue(ran)
+        host.stop()
+        XCTAssertEqual(host.start(), .stopped, "l'ancien moteur n'a pas fini : pas de second moteur")
+        XCTAssertEqual(InstanceLock.holderPID(at: Paths(root: root).lock), getpid(), "verrou gardé tant qu'il tourne")
+        gate.open()
+        let back = await waitUntil { host.refresh() == .hosting }
+        XCTAssertTrue(back, "reprise dès que l'ancien moteur s'est arrêté")
+    }
+
+    func testUnreadableConfigIsReportedNotMistakenForAMissingEmail() throws {
+        let root = try TempDir.make()
+        let host = try makeHost(root: root, email: nil)
+        defer { host.stop() }
+        try Data("{ \"email\": ".utf8).write(to: Paths(root: root).config)
+        guard case .configError(let message) = host.start() else { return XCTFail("\(host.mode)") }
+        XCTAssertTrue(message.contains("config.json"), message)
+        XCTAssertNil(InstanceLock.holderPID(at: Paths(root: root).lock))
+        var config = Config()
+        try config.set("email", BnB.email)
+        try config.save(to: Paths(root: root).config)
+        XCTAssertEqual(host.refresh(), .hosting)
+    }
+}
+
+final class Gate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var opened = false
+    var isOpen: Bool { lock.locked { opened } }
+    func open() { lock.locked { opened = true } }
 }

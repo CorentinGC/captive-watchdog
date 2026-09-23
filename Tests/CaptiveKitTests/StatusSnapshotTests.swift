@@ -56,4 +56,10 @@ final class StatusSnapshotTests: XCTestCase {
         XCTAssertTrue(EngineMode.observing(1).isObserving)
         XCTAssertFalse(EngineMode.hosting.isObserving)
     }
+
+    func testConfigErrorIsShown() {
+        let s = StatusSnapshot.make(state: WatchdogState(), mode: .configError("config.json illisible"), now: now)
+        XCTAssertEqual(s.engine, "Surveillance : config.json illisible")
+        XCTAssertEqual(s.symbol, "wifi.exclamationmark")
+    }
 }

@@ -14,6 +14,8 @@ public final class EngineHost: @unchecked Sendable {
     private var signalSource: DispatchSourceSignal?
     private var activity: NSObjectProtocol?
     private var suspended = false
+    /// Moteur annulé dont la tâche n'est pas encore sortie : il garde le verrou.
+    private var draining = false
     public private(set) var mode: EngineMode = .stopped
 
     var engine: WatchdogEngine? { guardLock.locked { runningEngine } }
@@ -24,6 +26,9 @@ public final class EngineHost: @unchecked Sendable {
         self.makeEngine = makeEngine
         self.sendSignal = sendSignal
         lock = InstanceLock(url: paths.lock)
+        // `captive-watchdog reconnect` signale quiconque tient le verrou, y
+        // compris l'app pendant un bref acquire : l'action par défaut la tuerait.
+        signal(SIGUSR1, SIG_IGN)
     }
 
     deinit { stop() }
@@ -50,9 +55,20 @@ public final class EngineHost: @unchecked Sendable {
             return mode
         }
         if mode == .hosting { return mode }
+        if guardLock.locked({ draining }) {
+            mode = .stopped
+            return mode
+        }
         try? paths.ensure()
         if (try? lock.acquire()) == true {
-            let config = (try? Config.load(from: paths.config)) ?? Config()
+            let config: Config
+            do {
+                config = try Config.load(from: paths.config)
+            } catch {
+                lock.release()
+                mode = .configError("config.json illisible (\(error.localizedDescription))")
+                return mode
+            }
             guard !config.email.isEmpty else {
                 lock.release()
                 mode = .needsEmail
@@ -68,14 +84,20 @@ public final class EngineHost: @unchecked Sendable {
 
     public func stop() {
         suspended = true
-        task?.cancel()
+        if let task {
+            // Le verrou est rendu par la tâche elle-même, une fois sortie :
+            // un « Reprendre » immédiat ne lance pas un second moteur.
+            guardLock.locked { draining = true }
+            task.cancel()
+        } else {
+            lock.release()
+        }
         task = nil
         guardLock.locked { runningEngine = nil }
         signalSource?.cancel()
         signalSource = nil
         if let activity { ProcessInfo.processInfo.endActivity(activity) }
         activity = nil
-        lock.release()
         mode = .stopped
     }
 
@@ -83,7 +105,7 @@ public final class EngineHost: @unchecked Sendable {
         switch mode {
         case .hosting: engine?.requestImmediateCycle()
         case .observing(let pid): _ = sendSignal(pid, SIGUSR1)
-        case .needsEmail, .stopped: break
+        case .needsEmail, .stopped, .configError: break
         }
     }
 
@@ -108,14 +130,17 @@ public final class EngineHost: @unchecked Sendable {
         // seraient espacées de plusieurs minutes, la sonde aussi.
         activity = ProcessInfo.processInfo.beginActivity(options: .userInitiatedAllowingIdleSystemSleep,
                                                          reason: "Surveillance du portail captif")
-        task = Task.detached { await engine.loop() }
+        task = Task.detached { [lock, guardLock, weak self] in
+            await engine.loop()
+            lock.release()
+            guardLock.locked { self?.draining = false }
+        }
     }
 
     /// `captive-watchdog reconnect` envoie SIGUSR1 au détenteur du verrou :
     /// sans gestionnaire, l'action par défaut tuerait l'app.
     private func installSignalHandler() {
         guard signalSource == nil else { return }
-        signal(SIGUSR1, SIG_IGN)
         let source = DispatchSource.makeSignalSource(signal: SIGUSR1, queue: .global())
         source.setEventHandler { [weak self] in self?.engine?.requestImmediateCycle() }
         source.resume()

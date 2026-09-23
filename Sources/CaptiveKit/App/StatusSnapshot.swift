@@ -10,6 +10,8 @@ public enum EngineMode: Equatable, Sendable {
     case needsEmail
     /// Surveillance suspendue par l'utilisateur.
     case stopped
+    /// config.json existe mais ne se lit pas : le moteur ne démarre pas.
+    case configError(String)
 
     public var isObserving: Bool {
         if case .observing = self { return true }
@@ -51,6 +53,9 @@ public struct StatusSnapshot: Equatable, Sendable {
         case .stopped:
             engine = "Surveillance : suspendue"
             symbol = "pause.circle"
+        case .configError(let message):
+            engine = "Surveillance : \(message)"
+            symbol = "wifi.exclamationmark"
         }
 
         let detail = state.lastRenew.map { date -> String in

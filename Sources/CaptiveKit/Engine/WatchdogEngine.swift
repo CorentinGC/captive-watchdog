@@ -130,6 +130,9 @@ public final class WatchdogEngine: @unchecked Sendable {
             transition(&state, to: .captive, detail: response.url.host)
             result = await handleCaptive(response, client: client, prober: prober, state: &state)
         }
+        // Surveillance suspendue en plein cycle : le réseau a échoué parce que la
+        // tâche est annulée, pas parce que le Wi-Fi est coupé. Rien à enregistrer.
+        guard !Task.isCancelled else { return result }
         try? store.save(state)
         return result
     }
@@ -183,6 +186,10 @@ public final class WatchdogEngine: @unchecked Sendable {
             }
         }
 
+        guard !Task.isCancelled else {
+            logger.info("cycle interrompu (surveillance suspendue)")
+            return .failed("interrompu")
+        }
         let end = environment.now()
         let host = outcome?.host ?? first.url.host ?? "inconnu"
         let ok = outcome?.verdict == .success || recoveredAlone
