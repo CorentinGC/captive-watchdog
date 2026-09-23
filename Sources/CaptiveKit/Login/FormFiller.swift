@@ -37,8 +37,10 @@ public struct FormCandidate: Codable, Equatable, Sendable {
 
 /// Heuristique générique éprouvée en v1, pilotable par un profil.
 public enum FormFiller {
-    public static let defaultSkipCheckbox = "optin|newsletter|marketing|offre|promo|publicit|advert|subscribe|loyalty"
-    static let emailHint = "e-?mail|courriel|adresse|user(name)?|login|identifiant|guest|client|nom"
+    public static let defaultSkipCheckbox =
+        "opt[-_ ]?in|newsletter|marketing|offre|offer|promo|publicit|advert|subscribe|loyalty|partenaire|partner|commercial|sms|communication|recevoir|receive|bons? plans|deals"
+    static let strongEmailHint = "e-?mail|courriel|mail"
+    static let weakEmailHint = "adresse|user(name)?|login|identifiant|guest|client"
     static let submitPrefer = "connect|log[-_ ]?in|continu|acce(s|d)|valider|entrer|start|submit"
     static let submitAvoid = "subscribe|join|adh[eé]r|register|inscri|sign[-_ ]?up|newsletter"
     static let skipFormHint = "search|recherche|newsletter"
@@ -47,12 +49,23 @@ public enum FormFiller {
         [f.name, f.id, f.placeholder].compactMap { $0 }.joined(separator: " ")
     }
 
+    /// Une case se juge aussi sur sa valeur et son libellé : c'est là que
+    /// les portails écrivent « newsletter » ou « offres partenaires ».
+    static func checkboxHint(_ f: HTMLField) -> String {
+        [f.name, f.id, f.placeholder, f.value, f.label].compactMap { $0 }.joined(separator: " ")
+    }
+
+    static func isTextInput(_ f: HTMLField) -> Bool {
+        f.tag == "input" && f.type == "text" && f.name != nil
+    }
+
     static func isSubmit(_ f: HTMLField) -> Bool {
         (f.tag == "input" && (f.type == "submit" || f.type == "image")) || (f.tag == "button" && f.type == "submit")
     }
 
     static func isEmailish(_ f: HTMLField) -> Bool {
-        f.type == "email" || (f.tag == "input" && f.type == "text" && Pattern.matches(emailHint, hint(f)))
+        f.type == "email" || (f.tag == "input" && f.type == "text"
+            && (Pattern.matches(strongEmailHint, hint(f)) || Pattern.matches(weakEmailHint, hint(f))))
     }
 
     public static func score(_ form: HTMLForm) -> Int {
@@ -104,9 +117,12 @@ public enum FormFiller {
                       rules: Profile.FormRules?, skipCheckbox: String) -> FilledForm {
         var pairs: [FormPair] = []
         var notes: [String] = []
+        // Priorité : profil, type=email, indice fort (mail), indice faible, premier champ texte.
         let emailName: String? = identity == nil ? nil : (rules?.fields?.email
-            ?? form.fields.first(where: isEmailish)?.name
-            ?? form.fields.first(where: { $0.tag == "input" && $0.type == "text" && $0.name != nil })?.name)
+            ?? form.fields.first(where: { $0.type == "email" && $0.name != nil })?.name
+            ?? form.fields.first(where: { isTextInput($0) && Pattern.matches(strongEmailHint, hint($0)) })?.name
+            ?? form.fields.first(where: { isTextInput($0) && Pattern.matches(weakEmailHint, hint($0)) })?.name
+            ?? form.fields.first(where: isTextInput)?.name)
         let passwordName = identity == nil ? nil : (rules?.fields?.password ?? form.fields.first { $0.type == "password" }?.name)
         let check = Set(rules?.checkboxes?.check ?? [])
         let skip = Set(rules?.checkboxes?.skip ?? [])
@@ -127,7 +143,7 @@ public enum FormFiller {
                     tick = true
                 } else if identity == nil {
                     tick = f.checked
-                } else if Pattern.matches(skipCheckbox, hint(f)) {
+                } else if Pattern.matches(skipCheckbox, checkboxHint(f)) {
                     tick = false
                     notes.append("case « \(name) » laissée décochée (motif marketing)")
                 } else {

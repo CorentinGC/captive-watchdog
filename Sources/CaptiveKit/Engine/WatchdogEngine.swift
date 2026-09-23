@@ -203,11 +203,16 @@ public final class WatchdogEngine: @unchecked Sendable {
             return .renewed
         }
         let reason = outcome?.reason ?? "échec"
+        let previousReason = state.lastFailureReason
         state.lastFailure = end
         state.lastFailureReason = reason
         state.consecutiveFailures += 1
-        logger.error("échec de reconnexion à \(host) : \(reason)")
-        if config.notify { environment.notifier.notify(title: "Wi-Fi : reconnexion impossible", body: "\(host) — \(reason)") }
+        logger.error("échec de reconnexion à \(host) : \(reason) (\(state.consecutiveFailures) échec(s) d'affilée)")
+        // Une notification par panne, pas une par cycle : seulement au premier
+        // échec d'une série ou quand la cause change.
+        if config.notify, state.consecutiveFailures == 1 || previousReason != reason {
+            environment.notifier.notify(title: "Wi-Fi : reconnexion impossible", body: "\(host) — \(reason)")
+        }
         return .failed(reason)
     }
 }

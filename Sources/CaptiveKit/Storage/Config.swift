@@ -48,6 +48,20 @@ public struct Config: Codable, Equatable, Sendable {
         maxChainHops = try c.decodeIfPresent(Int.self, forKey: .maxChainHops) ?? d.maxChainHops
         skipCheckbox = try c.decodeIfPresent(String.self, forKey: .skipCheckbox) ?? d.skipCheckbox
         probeURL = try c.decodeIfPresent(String.self, forKey: .probeURL) ?? d.probeURL
+        sanitize()
+    }
+
+    /// config.json peut être édité à la main et il est relu à chaque cycle :
+    /// une valeur dangereuse (boucle serrée, filtre marketing inopérant) est
+    /// ramenée à une valeur sûre plutôt que suivie.
+    mutating func sanitize() {
+        interval = max(5, interval)
+        retries = max(1, retries)
+        retryDelay = max(1, retryDelay)
+        failBackoff = max(30, failBackoff)
+        keepIncidents = max(1, keepIncidents)
+        maxChainHops = min(20, max(0, maxChainHops))
+        if !Pattern.isValid(skipCheckbox) { skipCheckbox = FormFiller.defaultSkipCheckbox }
     }
 
     public static func load(from url: URL) throws -> Config {
@@ -82,8 +96,8 @@ public struct Config: Codable, Equatable, Sendable {
         case "password": password = raw
         case "interval": interval = try max(5, number())
         case "retries": retries = try max(1, integer())
-        case "retryDelay": retryDelay = try number()
-        case "failBackoff": failBackoff = try number()
+        case "retryDelay": retryDelay = try max(1, number())
+        case "failBackoff": failBackoff = try max(30, number())
         case "verifyTLS": verifyTLS = try flag()
         case "notify": notify = try flag()
         case "keepIncidents": keepIncidents = try max(1, integer())

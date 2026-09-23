@@ -82,15 +82,22 @@ public final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Send
     /// La session retient son délégué : à appeler quand le client ne sert plus.
     public func close() { session.invalidateAndCancel() }
 
-    public func get(_ url: URL) async throws -> HTTPResponse {
-        try await send(method: "GET", url: url, body: nil)
+    /// `referer` : page d'où part la requête, comme un navigateur. Les portails
+    /// à middleware CSRF rejettent un POST sans Referer/Origin de même origine.
+    public func get(_ url: URL, referer: URL? = nil) async throws -> HTTPResponse {
+        try await send(method: "GET", url: url, body: nil, referer: referer)
     }
 
-    public func post(_ url: URL, form: [FormPair]) async throws -> HTTPResponse {
-        try await send(method: "POST", url: url, body: FormFiller.encode(form))
+    public func post(_ url: URL, form: [FormPair], referer: URL? = nil) async throws -> HTTPResponse {
+        try await send(method: "POST", url: url, body: FormFiller.encode(form), referer: referer)
     }
 
-    func send(method: String, url: URL, body: Data?) async throws -> HTTPResponse {
+    static func origin(of url: URL) -> String? {
+        guard let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased() else { return nil }
+        return url.port.map { "\(scheme)://\(host):\($0)" } ?? "\(scheme)://\(host)"
+    }
+
+    func send(method: String, url: URL, body: Data?, referer: URL? = nil) async throws -> HTTPResponse {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: options.timeout)
         request.httpMethod = method
         request.setValue(options.userAgent, forHTTPHeaderField: "User-Agent")
@@ -101,6 +108,10 @@ public final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Send
             request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         }
         if let cookie = jar.header(for: url) { request.setValue(cookie, forHTTPHeaderField: "Cookie") }
+        if let referer {
+            request.setValue(referer.absoluteString, forHTTPHeaderField: "Referer")
+            if method == "POST", let origin = Self.origin(of: referer) { request.setValue(origin, forHTTPHeaderField: "Origin") }
+        }
         lock.locked { redirects = [] }
 
         let result: (Data, URLResponse)

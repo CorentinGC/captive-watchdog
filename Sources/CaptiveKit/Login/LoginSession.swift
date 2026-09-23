@@ -92,7 +92,7 @@ public final class LoginSession {
             let filled = FormFiller.fill(picked.form, page: scanned, pageURL: page.url, identity: identity,
                                          profile: profile, skipCheckbox: config.skipCheckbox)
             filled.notes.forEach(note)
-            var response = try await submit(filled)
+            var response = try await submit(filled, from: page.url)
             incident?.record("login", response, request: RequestRecord(filled))
 
             let maxHops = profile.chain?.maxHops ?? config.maxChainHops
@@ -114,7 +114,7 @@ public final class LoginSession {
                         note("rebond vers un hôte inattendu : \(target)")
                     }
                     note("rebond \(hops) : formulaire caché vers \(replay.actionURL.host ?? "?")")
-                    response = try await submit(replay)
+                    response = try await submit(replay, from: response.url)
                     incident?.record("chain\(hops)", response, request: RequestRecord(replay))
                 } else if let refresh {
                     note("rebond \(hops) : meta refresh")
@@ -145,12 +145,12 @@ public final class LoginSession {
         }
     }
 
-    func submit(_ filled: FilledForm) async throws -> HTTPResponse {
-        if filled.method == "post" { return try await client.post(filled.actionURL, form: filled.payload) }
+    func submit(_ filled: FilledForm, from page: URL) async throws -> HTTPResponse {
+        if filled.method == "post" { return try await client.post(filled.actionURL, form: filled.payload, referer: page) }
         var components = URLComponents(url: filled.actionURL, resolvingAgainstBaseURL: true)!
         let query = String(decoding: FormFiller.encode(filled.payload), as: UTF8.self)
         components.percentEncodedQuery = query.isEmpty ? nil : query
-        return try await client.get(components.url ?? filled.actionURL)
+        return try await client.get(components.url ?? filled.actionURL, referer: page)
     }
 
     /// Hôte servant à choisir le profil : celui de <base href> s'il existe
