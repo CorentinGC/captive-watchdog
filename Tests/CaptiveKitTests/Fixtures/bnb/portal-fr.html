@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="B&B HOTELS WIFI Portal" />
+    <meta name="author" content="B&B HOTELS" />
+    <title>B&B HOTELS WIFI Portal</title>
+
+    <!-- Favicon -->
+    <link rel="shortcut icon" type="image/png" href="resources/images/favicon-16x16.png" />
+
+    <!-- Styles -->
+    <link href="resources/css/global.css" rel="stylesheet" />
+
+                                <!-- analytics script removed --></head>
+<body>
+    <div class="grid-container">
+        <div class="grid-item header">
+            <div class="header-content">
+                <img class="header-logo" src="resources/images/hotelbb_logo.svg" alt="B&B HOTELS logo" />
+
+                <h1 class="header-title">Bienvenue</h1>
+
+                <h4 class="header-description">
+                    Connectez-vous &agrave; notre r&eacute;seau WIFI pour profiter au mieux de votre s&eacute;jour.                </h4>
+            </div>
+        </div>
+<div class="grid-item main">
+    <form method="post" id="access-wifi" action="wifi-access.php">
+        <input type="hidden" name="csrf_token" value="CSRF_TOKEN_PLACEHOLDER">
+        <input type="text" name="email" value="" placeholder="Adresse e-mail" id="" />
+
+        
+                    <label for="" class="">
+                <input type="checkbox" name="chartConsent" value="true" id=""  />
+                En cochant cette case, j'accepte les                 <a href="../resources/pdf/CGU.pdf" title="CGU">conditions du service Wifi </a>
+                et la                 <a href="http://www.wifirst.com/politique-de-confidentialite">politique de confidentialit&eacute;.</a>
+            </label>
+        
+        
+        <label for="">
+            <input type="checkbox" name="optinEmail" value="true"  />
+            J'accepte de recevoir des offres, des avantages et des communications personnalis&eacute;s par e-mail de la part de B&amp;B HOTELS et du programme B&amp;me, adapt&eacute;s en fonction de mes pr&eacute;f&eacute;rences, de mon historique de r&eacute;servation, de mon statut de fid&eacute;lit&eacute; et de mes interactions avec les services B&amp;B HOTELS, ainsi que de l'utilisation de traceurs (&ldquo;pixels&rdquo;) dans l'e-mail et, lorsque j'y ai consenti, de mes donn&eacute;es de navigation sur le site web ou l'application, et/ou de mon activit&eacute; sur des sites partenaires tiers (Google Ads), y compris les r&eacute;seaux sociaux (META : Facebook et Instagram, TikTok, LinkedIn). Je suis inform&eacute;(e) que je peux retirer ce consentement &agrave; tout moment avec effet imm&eacute;diat.        </label>
+
+        <p class="form-description">
+            Vous recevrez un e-mail de confirmation dans votre bo&icirc;te de r&eacute;ception.        </p>
+
+        <div class="center">
+            <input class="button" type="submit" name="connect" id="" value="Se connecter" />
+        </div>
+    </form>
+</div>
+
+<script type="text/javascript">
+    function autoSubmit() {
+        document.getElementById('access-wifi').submit();
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const checkboxes = document.querySelectorAll('input.subscribe, input.connect');
+
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', autoSubmit);
+        });
+    });
+</script>
+
+
+<div class="grid-item footer">
+    <div class="footer-content">
+        <div class="margin-bottom">
+            <img class="loyalty-logo" src="resources/images/loyalty_logo.svg" alt="B&Me logo" />
+
+            <p class="loyalty-description">
+                Rejoignez B&amp;me et b&eacute;n&eacute;ficiez d'avantages exclusifs :            </p>
+        </div>
+
+        <ul class="margin-bottom">
+            <li>
+                Petit-d&eacute;jeuner gratuit lors de votre prochain s&eacute;jour.            </li>
+            <li>
+                Offres sp&eacute;ciales : b&eacute;n&eacute;ficiez d'un tarif de bienvenue de 50 euros dans les nouveaux h&ocirc;tels, d'un acc&egrave;s aux ventes priv&eacute;es, et plus encore.            </li>
+            <li>
+                Les avantages suppl&eacute;mentaires varient selon les pays : bouteille d'eau gratuite en Allemagne, tirages au sort en France, et bien d'autres encore.            </li>
+        </ul>
+
+        <div class="center">
+            <input class="button" id="subscribe" type="submit" name="subscribe" value="Adh&eacute;rer gratuitement" form="access-wifi" />
+        </div>
+    </div>
+</div>
+</div>
+</body>
+
+</html>

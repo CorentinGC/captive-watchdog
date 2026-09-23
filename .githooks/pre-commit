@@ -1,0 +1,2 @@
+#!/bin/sh
+exec sh "$(git rev-parse --show-toplevel)/Scripts/check-anonymity.sh"

@@ -1,0 +1,41 @@
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="B&B HOTELS WIFI Portal" />
+    <meta name="author" content="B&B HOTELS" />
+    <title>B&B HOTELS WIFI Portal</title>
+
+    <!-- Favicon -->
+    <link rel="shortcut icon" type="image/png" href="resources/images/favicon-16x16.png" />
+
+    <!-- Styles -->
+    <link href="resources/css/global.css" rel="stylesheet" />
+
+                                <!-- analytics script removed --></head>
+<div class="grid-container">
+    <div class="grid-item">
+        <h1 class="redirection-title">Redirection en cours...</h1>
+        <p class="redirection-description">Merci de patienter, vous allez &ecirc;tre automatiquement redirig&eacute; vers Internet.</p>
+
+        <!-- Form for authentication submission -->
+        <form id="authsubmit" method="post" action="https://redirect-wifi.moveon-hotelbb.com/reg.php">
+            <!-- Hidden input fields data to send to the wifi terminal -->
+            <input type="hidden" name="username" value="000000000000_1700000000" />
+            <input type="hidden" name="password" value="000000000000" />
+            <input type="hidden" name="autherr" value="0" />
+
+            <p class="redirection-description">
+                Si ce n'est pas le cas, veuillez cliquer ici :            </p>
+
+            <button class="button" type="submit">
+                J'acc&egrave;de &agrave; Internet            </button>
+        </form>
+
+        <!-- JavaScript to automatically submit the form on page load -->
+        <script type="text/javascript">
+            document.addEventListener('DOMContentLoaded', function() {
+                document.getElementById('authsubmit').submit();
+            });
+        </script>
+    </div>
+</div>
