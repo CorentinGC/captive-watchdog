@@ -138,7 +138,13 @@ public final class WatchdogEngine: @unchecked Sendable {
     }
 
     func transition(_ state: inout WatchdogState, to status: NetworkStatus, detail: String?) {
-        guard state.status != status else { return }
+        defer { state.statusDetail = detail }
+        guard state.status != status else {
+            // Hors ligne qui change de cause (Wi-Fi absent → DNS bloqué…) :
+            // seule trace pour diagnostiquer un portail passé inaperçu.
+            if status == .offline, let detail, detail != state.statusDetail { logger.info("hors ligne : \(detail)") }
+            return
+        }
         logger.info("statut : \(state.status.rawValue) → \(status.rawValue)" + (detail.map { " (\($0))" } ?? ""))
         state.status = status
         state.since = environment.now()

@@ -54,7 +54,9 @@ The app sends its own plain HTTP request to Apple's captivity probe. On a captiv
 network, the gateway intercepts it and answers with the portal instead. The host
 name of that portal (for example `wifi.moveon-hotelbb.com`) selects a **profile**.
 If no profile matches, a generic heuristic handles the page, and that is enough for
-most portals. No SSID is needed: macOS hides it from background processes anyway.
+most portals. Some portals block DNS until you log in: when the probe cannot
+resolve, it retries against Apple's IP address directly, so those are caught too.
+No SSID is needed: macOS hides it from background processes anyway.
 
 ## Features
 

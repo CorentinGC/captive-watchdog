@@ -16,6 +16,10 @@ final class StubURLProtocol: URLProtocol {
         var status = 200
         var headers: [String: String] = [:]
         var body = Data()
+        var failure: URLError.Code?
+
+        /// Échec réseau précis (ex. DNS : `.cannotFindHost`).
+        static func fail(_ code: URLError.Code) -> Reply { Reply(failure: code) }
 
         static func html(_ s: String, status: Int = 200, headers: [String: String] = [:]) -> Reply {
             var h = headers
@@ -58,6 +62,10 @@ final class StubURLProtocol: URLProtocol {
         Self.lock.locked { Self.recorded.append(req) }
         guard let reply = Self.handler?(req) else {
             client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        }
+        if let failure = reply.failure {
+            client?.urlProtocol(self, didFailWithError: URLError(failure))
             return
         }
         let response = HTTPURLResponse(url: req.url, statusCode: reply.status, httpVersion: "HTTP/1.1", headerFields: reply.headers)!

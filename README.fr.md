@@ -55,7 +55,10 @@ L'app envoie elle-même une requête HTTP simple à la sonde de captivité d'App
 un réseau captif, la passerelle l'intercepte et répond à la place avec le portail.
 Le nom d'hôte de ce portail (par exemple `wifi.moveon-hotelbb.com`) désigne un
 **profil**. Si aucun profil ne correspond, une heuristique générique traite la page,
-et elle suffit pour la plupart des portails. Le SSID n'est pas nécessaire : macOS
+et elle suffit pour la plupart des portails. Certains portails bloquent le DNS
+tant qu'on n'est pas connecté : si la sonde ne peut pas résoudre le nom, elle
+réessaie directement sur l'adresse IP d'Apple, et ces portails sont détectés
+aussi. Le SSID n'est pas nécessaire : macOS
 le masque de toute façon aux processus d'arrière-plan.
 
 ## Fonctionnalités

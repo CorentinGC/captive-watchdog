@@ -7,6 +7,8 @@ public enum NetworkStatus: String, Codable, Sendable {
 public struct WatchdogState: Codable, Equatable, Sendable {
     public var status: NetworkStatus = .unknown
     public var since: Date?
+    /// Précision du statut courant (cause du hors-ligne, hôte du portail).
+    public var statusDetail: String?
     public var lastCheck: Date?
     public var lastRenew: Date?
     public var lastRenewDuration: Double?

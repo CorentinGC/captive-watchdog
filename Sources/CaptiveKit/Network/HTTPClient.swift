@@ -19,12 +19,13 @@ public struct HTTPResponse: Sendable {
 }
 
 public enum HTTPError: Error, CustomStringConvertible {
-    case transport(String)
+    /// `code` : code URLError d'origine (ex. -1009 = machine non connectée).
+    case transport(String, code: Int? = nil)
     case notHTTP
 
     public var description: String {
         switch self {
-        case .transport(let message): return message
+        case .transport(let message, _): return message
         case .notHTTP: return "réponse non HTTP"
         }
     }
@@ -84,8 +85,9 @@ public final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Send
 
     /// `referer` : page d'où part la requête, comme un navigateur. Les portails
     /// à middleware CSRF rejettent un POST sans Referer/Origin de même origine.
-    public func get(_ url: URL, referer: URL? = nil) async throws -> HTTPResponse {
-        try await send(method: "GET", url: url, body: nil, referer: referer)
+    /// `host` : remplace l'en-tête Host (URL à IP littérale, DNS contourné).
+    public func get(_ url: URL, referer: URL? = nil, host: String? = nil) async throws -> HTTPResponse {
+        try await send(method: "GET", url: url, body: nil, referer: referer, host: host)
     }
 
     public func post(_ url: URL, form: [FormPair], referer: URL? = nil) async throws -> HTTPResponse {
@@ -97,12 +99,13 @@ public final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Send
         return url.port.map { "\(scheme)://\(host):\($0)" } ?? "\(scheme)://\(host)"
     }
 
-    func send(method: String, url: URL, body: Data?, referer: URL? = nil) async throws -> HTTPResponse {
+    func send(method: String, url: URL, body: Data?, referer: URL? = nil, host: String? = nil) async throws -> HTTPResponse {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: options.timeout)
         request.httpMethod = method
         request.setValue(options.userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue(options.acceptLanguage, forHTTPHeaderField: "Accept-Language")
         request.setValue("text/html,application/xhtml+xml,*/*;q=0.8", forHTTPHeaderField: "Accept")
+        if let host { request.setValue(host, forHTTPHeaderField: "Host") }
         if let body {
             request.httpBody = body
             request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -118,7 +121,7 @@ public final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Send
         do {
             result = try await session.data(for: request)
         } catch {
-            throw HTTPError.transport(error.localizedDescription)
+            throw HTTPError.transport(error.localizedDescription, code: (error as? URLError)?.errorCode)
         }
         guard let http = result.1 as? HTTPURLResponse else { throw HTTPError.notHTTP }
         let finalURL = http.url ?? url
