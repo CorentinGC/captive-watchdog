@@ -42,10 +42,13 @@ public struct HTTPClientOptions {
     public var userAgent: String
     public var acceptLanguage: String
     public var protocolClasses: [AnyClass]
+    /// Voie utilisée après `bindToInterface()` (Wi-Fi retenue par macOS).
+    public var boundTransport: BoundTransport
 
     public init(verifyTLS: Bool = true, timeout: TimeInterval = 15, maxRedirects: Int = 10,
                 maxBodyBytes: Int = 2_000_000, userAgent: String = HTTPClientOptions.safariUserAgent,
-                acceptLanguage: String = "fr-FR,fr;q=0.9,en;q=0.8", protocolClasses: [AnyClass] = []) {
+                acceptLanguage: String = "fr-FR,fr;q=0.9,en;q=0.8", protocolClasses: [AnyClass] = [],
+                boundTransport: BoundTransport = InterfaceBoundTransport()) {
         self.verifyTLS = verifyTLS
         self.timeout = timeout
         self.maxRedirects = maxRedirects
@@ -53,6 +56,7 @@ public struct HTTPClientOptions {
         self.userAgent = userAgent
         self.acceptLanguage = acceptLanguage
         self.protocolClasses = protocolClasses
+        self.boundTransport = boundTransport
     }
 }
 
@@ -64,6 +68,7 @@ public final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Send
     private var session: URLSession!
     private let lock = NSLock()
     private var redirects: [Redirect] = []
+    private var bound = false
 
     public init(options: HTTPClientOptions = HTTPClientOptions()) {
         self.options = options
@@ -82,6 +87,12 @@ public final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Send
 
     /// La session retient son délégué : à appeler quand le client ne sert plus.
     public func close() { session.invalidateAndCancel() }
+
+    /// Toutes les requêtes suivantes passent par `options.boundTransport`,
+    /// liées à la Wi-Fi : seule voie tant que la fenêtre de connexion macOS
+    /// retient l'interface (les requêtes ordinaires échouent alors en -1009).
+    public func bindToInterface() { lock.locked { bound = true } }
+    public var isBoundToInterface: Bool { lock.locked { bound } }
 
     /// `referer` : page d'où part la requête, comme un navigateur. Les portails
     /// à middleware CSRF rejettent un POST sans Referer/Origin de même origine.
@@ -118,10 +129,14 @@ public final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Send
         lock.locked { redirects = [] }
 
         let result: (Data, URLResponse)
-        do {
-            result = try await session.data(for: request)
-        } catch {
-            throw HTTPError.transport(error.localizedDescription, code: (error as? URLError)?.errorCode)
+        if isBoundToInterface {
+            result = try await sendBound(request)
+        } else {
+            do {
+                result = try await session.data(for: request)
+            } catch {
+                throw HTTPError.transport(error.localizedDescription, code: (error as? URLError)?.errorCode)
+            }
         }
         guard let http = result.1 as? HTTPURLResponse else { throw HTTPError.notHTTP }
         let finalURL = http.url ?? url
@@ -133,6 +148,37 @@ public final class HTTPClient: NSObject, URLSessionTaskDelegate, @unchecked Send
         return HTTPResponse(url: finalURL, status: http.statusCode, headers: headers,
                             body: Self.decodeBody(data, contentType: contentType),
                             redirects: lock.locked { redirects })
+    }
+
+    /// Mode lié : le transport ne suit pas les redirections, on les suit ici
+    /// avec les mêmes règles que URLSession (301/302/303 : POST → GET).
+    private func sendBound(_ first: URLRequest) async throws -> (Data, URLResponse) {
+        var request = first
+        while true {
+            let (data, response) = try await options.boundTransport.send(
+                request, verifyTLS: options.verifyTLS, timeout: options.timeout, maxBodyBytes: options.maxBodyBytes)
+            guard let from = request.url, (300..<400).contains(response.statusCode), response.statusCode != 304,
+                  let location = response.value(forHTTPHeaderField: "Location"),
+                  let to = URL(string: location, relativeTo: from)?.absoluteURL else { return (data, response) }
+            jar.ingest(response, for: from)
+            let accepted: Bool = lock.locked {
+                guard redirects.count < options.maxRedirects else { return false }
+                redirects.append(Redirect(code: response.statusCode, from: from.absoluteString, to: to.absoluteString))
+                return true
+            }
+            guard accepted else { return (data, response) }
+            var next = request
+            next.url = to
+            // Host forcé : valable pour l'IP littérale de départ seulement.
+            next.setValue(nil, forHTTPHeaderField: "Host")
+            next.setValue(jar.header(for: to), forHTTPHeaderField: "Cookie")
+            if ![307, 308].contains(response.statusCode) {
+                next.httpMethod = "GET"
+                next.httpBody = nil
+                next.setValue(nil, forHTTPHeaderField: "Content-Type")
+            }
+            request = next
+        }
     }
 
     public static func decodeBody(_ data: Data, contentType: String?) -> String {

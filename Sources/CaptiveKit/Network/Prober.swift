@@ -19,11 +19,20 @@ public struct Prober: Sendable {
     /// nom échoue alors comme si le Wi-Fi était coupé. On retente sur l'IP
     /// d'Apple avec l'en-tête Host d'origine ; si le réseau répond autre chose
     /// que `Success`, c'est le portail.
+    /// « Non connecté » (-1009) alors qu'une Wi-Fi est associée : macOS la
+    /// retient derrière sa fenêtre de connexion. On resonde en liant le client
+    /// à la Wi-Fi ; il le reste pour la suite du cycle (login compris).
     public func probe(using client: HTTPClient) async -> ProbeResult {
         do {
             return classify(try await client.get(url))
         } catch {
             let reason = String(describing: error)
+            if Self.isNotConnected(error), !client.isBoundToInterface {
+                client.bindToInterface()
+                let viaWiFi = await probe(using: client)
+                if case .offline = viaWiFi { return .offline(reason) }
+                return viaWiFi
+            }
             guard let fallback = fallbackURL, !Self.isNotConnected(error),
                   let r = try? await client.get(fallback, host: url.host) else { return .offline(reason) }
             if case .online = classify(r) { return .offline(reason) }

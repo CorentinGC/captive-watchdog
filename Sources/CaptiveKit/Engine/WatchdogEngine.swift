@@ -127,6 +127,7 @@ public final class WatchdogEngine: @unchecked Sendable {
             transition(&state, to: .offline, detail: why)
             result = .offline
         case .captive(let response):
+            if client.isBoundToInterface { logger.info("Wi-Fi retenue par la fenêtre de connexion macOS : requêtes liées à la Wi-Fi") }
             transition(&state, to: .captive, detail: response.url.host)
             result = await handleCaptive(response, client: client, prober: prober, state: &state)
         }

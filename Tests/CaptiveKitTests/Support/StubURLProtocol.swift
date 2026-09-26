@@ -49,7 +49,9 @@ final class StubURLProtocol: URLProtocol {
     }
 
     static func client(maxRedirects: Int = 10) -> HTTPClient {
-        HTTPClient(options: HTTPClientOptions(maxRedirects: maxRedirects, protocolClasses: [StubURLProtocol.self]))
+        // Voie Wi-Fi liée coupée : aucun test ne doit toucher le vrai réseau.
+        HTTPClient(options: HTTPClientOptions(maxRedirects: maxRedirects, protocolClasses: [StubURLProtocol.self],
+                                              boundTransport: StubBoundTransport { _ in nil }))
     }
 
     override class func canInit(with request: URLRequest) -> Bool { true }
