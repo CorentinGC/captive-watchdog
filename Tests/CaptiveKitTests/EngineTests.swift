@@ -53,6 +53,28 @@ final class EngineTests: XCTestCase {
         XCTAssertTrue(notifier.titles.isEmpty)
     }
 
+    func testPortalLoopFailsWithoutRetriesAndRetriesSoon() async throws {
+        let scenario = BnbScenario()
+        scenario.portalLoops = true
+        scenario.install()
+        let root = try TempDir.make()
+        let engine = makeEngine(root: root, notifier: RecordingNotifier())
+        let result = await engine.runOnce()
+        XCTAssertEqual(result, .failed("portail en boucle de redirection (panne côté réseau)"))
+        XCTAssertEqual(StateStore(paths: Paths(root: root)).history().map(\.attempts), [1])
+        XCTAssertEqual(engine.pause(after: result), engine.config.faultBackoff)
+    }
+
+    func testOrdinaryFailureKeepsTheLongBackoff() async throws {
+        let scenario = BnbScenario()
+        scenario.grantAccess = false
+        scenario.install()
+        let engine = makeEngine(root: try TempDir.make(), notifier: RecordingNotifier())
+        let result = await engine.runOnce()
+        XCTAssertEqual(engine.pause(after: result), engine.config.failBackoff)
+        XCTAssertEqual(engine.pause(after: .online), engine.config.interval)
+    }
+
     func testFailureRetriesThenRecordsOneFailedEvent() async throws {
         let scenario = BnbScenario()
         scenario.grantAccess = false

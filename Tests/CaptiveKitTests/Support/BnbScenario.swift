@@ -6,6 +6,9 @@ final class BnbScenario {
     var authed = false
     /// false : le POST 2 n'ouvre pas l'accès (échec côté passerelle).
     var grantAccess = true
+    /// true : le portail se redirige vers lui-même sans fin (panne vue le
+    /// 2026-09-27, 302 servis par le contrôleur local au lieu du portail).
+    var portalLoops = false
 
     func install() {
         StubURLProtocol.reset { [unowned self] in self.reply($0) }
@@ -16,6 +19,7 @@ final class BnbScenario {
         case ("GET", "captive.apple.com", _):
             return authed ? .html(BnB.successPage) : .redirect(BnB.probeRedirect)
         case ("GET", "wifi.moveon-hotelbb.com", "/"):
+            if portalLoops { return .redirect(r.url.absoluteString) }
             return .html(try! Fixture.string("bnb/portal-fr.html"),
                          headers: ["Set-Cookie": "SESSIONID=abc123; Path=/; Max-Age=600; Secure; HttpOnly"])
         case ("POST", "wifi.moveon-hotelbb.com", "/wifi-access.php"):

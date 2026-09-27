@@ -19,6 +19,9 @@ public struct Config: Codable, Equatable, Sendable {
     public var retries = 3
     public var retryDelay: Double = 4
     public var failBackoff: Double = 300
+    /// Pause plus courte quand l'échec vient du réseau (portail en boucle) :
+    /// rien à corriger de notre côté, on guette seulement son retour.
+    public var faultBackoff: Double = 60
     /// Désactivé par défaut : les portails captifs servent souvent des
     /// certificats invalides, et seul l'e-mail transite.
     public var verifyTLS = false
@@ -29,7 +32,7 @@ public struct Config: Codable, Equatable, Sendable {
     public var probeURL = Prober.defaultURL.absoluteString
 
     public static let keys = ["email", "password", "interval", "retries", "retryDelay", "failBackoff",
-                              "verifyTLS", "notify", "keepIncidents", "maxChainHops", "skipCheckbox", "probeURL"]
+                              "faultBackoff", "verifyTLS", "notify", "keepIncidents", "maxChainHops", "skipCheckbox", "probeURL"]
 
     public init() {}
 
@@ -42,6 +45,7 @@ public struct Config: Codable, Equatable, Sendable {
         retries = try c.decodeIfPresent(Int.self, forKey: .retries) ?? d.retries
         retryDelay = try c.decodeIfPresent(Double.self, forKey: .retryDelay) ?? d.retryDelay
         failBackoff = try c.decodeIfPresent(Double.self, forKey: .failBackoff) ?? d.failBackoff
+        faultBackoff = try c.decodeIfPresent(Double.self, forKey: .faultBackoff) ?? d.faultBackoff
         verifyTLS = try c.decodeIfPresent(Bool.self, forKey: .verifyTLS) ?? d.verifyTLS
         notify = try c.decodeIfPresent(Bool.self, forKey: .notify) ?? d.notify
         keepIncidents = try c.decodeIfPresent(Int.self, forKey: .keepIncidents) ?? d.keepIncidents
@@ -59,6 +63,7 @@ public struct Config: Codable, Equatable, Sendable {
         retries = max(1, retries)
         retryDelay = max(1, retryDelay)
         failBackoff = max(30, failBackoff)
+        faultBackoff = max(20, faultBackoff)
         keepIncidents = max(1, keepIncidents)
         maxChainHops = min(20, max(0, maxChainHops))
         if !Pattern.isValid(skipCheckbox) { skipCheckbox = FormFiller.defaultSkipCheckbox }
@@ -98,6 +103,7 @@ public struct Config: Codable, Equatable, Sendable {
         case "retries": retries = try max(1, integer())
         case "retryDelay": retryDelay = try max(1, number())
         case "failBackoff": failBackoff = try max(30, number())
+        case "faultBackoff": faultBackoff = try max(20, number())
         case "verifyTLS": verifyTLS = try flag()
         case "notify": notify = try flag()
         case "keepIncidents": keepIncidents = try max(1, integer())

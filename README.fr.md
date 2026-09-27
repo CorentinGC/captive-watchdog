@@ -153,6 +153,7 @@ d'afficher son état et lui transmet **Reconnecter maintenant**.
 | `retries` | `3` | Tentatives de connexion par coupure |
 | `retryDelay` | `4` | Secondes entre deux tentatives |
 | `failBackoff` | `300` | Pause après une coupure non résolue avant de réessayer |
+| `faultBackoff` | `60` | Pause plus courte quand le portail lui-même est en panne (boucle de redirection) : rien à corriger chez nous, on guette son retour |
 | `notify` | `true` | Notification macOS à la reconnexion ou en cas d'échec |
 | `verifyTLS` | `false` | Les portails ont souvent des certificats cassés |
 | `keepIncidents` | `10` | Dossiers d'analyse conservés |

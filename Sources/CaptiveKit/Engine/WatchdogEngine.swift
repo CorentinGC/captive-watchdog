@@ -66,6 +66,8 @@ public final class WatchdogEngine: @unchecked Sendable {
     let store: StateStore
     private let lock = NSLock()
     private var wakeRequested = false
+    /// Dernier échec imputable au réseau : pause courte avant le cycle suivant.
+    private var lastFailureWasFault = false
 
     public init(paths: Paths, config: Config, logger: Logger, environment: Environment) {
         self.paths = paths
@@ -88,12 +90,13 @@ public final class WatchdogEngine: @unchecked Sendable {
         logger.info("démarrage du watchdog (pid \(getpid()), sonde toutes les \(Int(config.interval)) s)")
         while !Task.isCancelled {
             let result = await runOnce()
-            if case .failed = result {
-                await nap(config.failBackoff)
-            } else {
-                await nap(config.interval)
-            }
+            await nap(pause(after: result))
         }
+    }
+
+    func pause(after result: CycleResult) -> Double {
+        guard case .failed = result else { return config.interval }
+        return lastFailureWasFault ? config.faultBackoff : config.failBackoff
     }
 
     /// Sommeil découpé en tranches de 0,5 s pour réagir vite à « reconnecter ».
@@ -168,6 +171,7 @@ public final class WatchdogEngine: @unchecked Sendable {
         var attempts = 0
         var recoveredAlone = false
         let retries = max(1, config.retries)
+        lastFailureWasFault = false
 
         attemptLoop: for attempt in 1...retries {
             attempts = attempt
@@ -178,6 +182,10 @@ public final class WatchdogEngine: @unchecked Sendable {
             outcome = o
             if o.verdict == .success { break }
             logger.warn("tentative \(attempt)/\(retries) échouée : \(o.reason ?? "?") (incident \(o.incident ?? "-"))")
+            if o.portalFault {
+                lastFailureWasFault = true
+                break
+            }
             guard attempt < retries else { break }
             await environment.sleep(config.retryDelay)
             activeClient = environment.makeClient(config)
@@ -186,7 +194,8 @@ public final class WatchdogEngine: @unchecked Sendable {
             case .online:
                 recoveredAlone = true
                 break attemptLoop
-            case .offline:
+            case .offline(let why):
+                logger.info("plus de réseau entre deux tentatives : \(why)")
                 break attemptLoop
             case .captive(let r):
                 captive = r

@@ -114,4 +114,17 @@ final class LoginSessionTests: XCTestCase {
         XCTAssertEqual(posts().count, 1 + 3)
         XCTAssertTrue(outcome.notes.contains("plafond de 3 rebonds atteint"))
     }
+
+    func testPortalRedirectingToItselfIsReportedAsANetworkFault() async throws {
+        let scenario = BnbScenario()
+        scenario.portalLoops = true
+        scenario.install()
+        let client = StubURLProtocol.client()
+        defer { client.close() }
+        let outcome = await session(client: client).run(captive: try await captive(client))
+        XCTAssertEqual(outcome.verdict, .failure)
+        XCTAssertTrue(outcome.portalFault)
+        XCTAssertEqual(outcome.reason, "portail en boucle de redirection (panne côté réseau)")
+        XCTAssertTrue(posts().isEmpty)
+    }
 }

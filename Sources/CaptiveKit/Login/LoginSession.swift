@@ -9,6 +9,8 @@ public struct LoginOutcome: Sendable {
     public var reason: String?
     public var notes: [String]
     public var incident: String?
+    /// Échec dû au réseau, pas au formulaire : réessayer tout de suite ne sert à rien.
+    public var portalFault = false
 }
 
 /// Une passe de login complète sur un portail (spec §6, étapes 2 à 7 hors
@@ -59,10 +61,10 @@ public final class LoginSession {
             logger.info(text)
         }
 
-        func finish(_ verdict: LoginOutcome.Verdict, _ reason: String?) -> LoginOutcome {
+        func finish(_ verdict: LoginOutcome.Verdict, _ reason: String?, portalFault: Bool = false) -> LoginOutcome {
             incident?.finish(verdict: verdict.rawValue, reason: reason)
             return LoginOutcome(verdict: verdict, host: host, profile: profileID, reason: reason,
-                                notes: notes, incident: incident?.name)
+                                notes: notes, incident: incident?.name, portalFault: portalFault)
         }
 
         incident?.record("portal", probe)
@@ -84,6 +86,11 @@ public final class LoginSession {
             note("profil « \(profile.id) » pour \(host)")
 
             guard let picked = FormFiller.pickLoginForm(scanned, profile: profile) else {
+                // Plafond de redirections atteint sur une réponse encore 3xx :
+                // le portail tourne en rond (vu chez B&B, 302 vers lui-même).
+                if (300..<400).contains(page.status), page.header("Location") != nil {
+                    return finish(.failure, "portail en boucle de redirection (panne côté réseau)", portalFault: true)
+                }
                 let hasScript = page.body.range(of: "<script", options: .caseInsensitive) != nil
                 return finish(.failure, hasScript ? "aucun formulaire HTML exploitable (portail JavaScript ?)"
                                                   : "aucun formulaire HTML exploitable")

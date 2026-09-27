@@ -148,6 +148,7 @@ displays its state and relays **Reconnecter maintenant** to it.
 | `retries` | `3` | Login attempts per outage |
 | `retryDelay` | `4` | Seconds between attempts |
 | `failBackoff` | `300` | Pause after a failed outage before trying again |
+| `faultBackoff` | `60` | Shorter pause when the portal itself is broken (redirect loop): nothing to fix on our side, just watch for its return |
 | `notify` | `true` | macOS notification on reconnection or failure |
 | `verifyTLS` | `false` | Portals often have broken certificates |
 | `keepIncidents` | `10` | Post-mortem folders kept |
